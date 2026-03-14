@@ -104,3 +104,7 @@ local_settings.py
 
 .vscode
 .vscode/*
+
+cfg/prompt.txt
+
+.DS_Store

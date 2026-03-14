@@ -1,6 +1,6 @@
 import json
 import xml.etree.ElementTree as ET
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Tuple
 from pathlib import Path
 
 
@@ -164,6 +164,10 @@ def extract_instruct_data(path: str) -> Dict:
     data["instruct"] = instruct_json_data["instruct"]
     return data
 
+def extract_data(account_path: str, instruct_path: str) -> Tuple[Dict, Dict]:
+    account_data = extract_account_data(account_path)
+    instruct_data = extract_instruct_data(instruct_path)
+    return account_data, instruct_data
 
 if __name__ == "__main__":
     base = Path(__file__).resolve().parent.parent
