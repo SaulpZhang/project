@@ -7,7 +7,7 @@ def _to_pretty_json(data: Any) -> str:
 
 
 def build_generation_prompt(account_data: Dict, instruct_data: Dict, prompt_config: Dict) -> str:
-    """Build the base prompt for SMT-LIB v2 generation from a template file."""
+    """Build the base prompt for Python z3 generation from a template file."""
     instruct_text = (instruct_data or {}).get("instruct", "")
     template_path = prompt_config.get("base_prompt_template_path")
     if not template_path:
@@ -26,7 +26,7 @@ def load_prompt_file(path: str) -> str:
 
 
 def rewrite_prompt_with_llm(base_prompt: str, prompt_config: Dict, llm_config: Dict, llm_client: Any) -> str:
-    """Optionally rewrite the prompt with an LLM to improve SMT generation quality."""
+    """Optionally rewrite the prompt with an LLM to improve Python z3 generation quality."""
     if not prompt_config.get("rewrite_enabled", False):
         return base_prompt
 
@@ -34,7 +34,7 @@ def rewrite_prompt_with_llm(base_prompt: str, prompt_config: Dict, llm_config: D
     if not rewrite_model:
         return base_prompt
 
-    system_prompt = "你是 prompt 优化专家。请在不改变语义的前提下，重写用户输入，使其更适合让模型生成高质量 SMT-LIB v2 代码。"
+    system_prompt = "你是 prompt 优化专家。请在不改变语义的前提下，重写用户输入，使其更适合让模型生成高质量的 Python z3 代码。"
     system_prompt_path = prompt_config.get("rewrite_system_prompt_path")
     if system_prompt_path:
         try:
@@ -45,7 +45,7 @@ def rewrite_prompt_with_llm(base_prompt: str, prompt_config: Dict, llm_config: D
 
     rewrite_user_instruction = prompt_config.get(
         "rewrite_user_instruction",
-        "请重写以下 prompt，并保留其核心语义。输出仅包含重写后的 prompt 文本。",
+        "请重写以下 prompt，并保留其核心语义。输出仅包含重写后的 prompt 文本，且目标是生成 Python z3 代码。",
     )
 
     messages = [

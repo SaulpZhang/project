@@ -62,7 +62,7 @@ if __name__ == "__main__":
         final_prompt = rewrite_prompt_with_llm(base_prompt, prompt_config, llm_config, llm_client)
         smtlib_code = generate_smtlib_code(final_prompt, llm_config, llm_client)
 
-        out_name = f"{Path(account_path).stem}.smt2"
+        out_name = f"{Path(account_path).stem}.py"
         out_path = output_dir / out_name
         with open(out_path, "w", encoding="utf-8") as f:
             f.write(smtlib_code)

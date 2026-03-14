@@ -12,7 +12,7 @@ prompt:
   base_prompt_template_path: './cfg/prompt_template.txt'
   rewrite_enabled: true
   rewrite_system_prompt_path: './prompt/prompt_rewrite_system.txt'
-  rewrite_user_instruction: '请重写以下 prompt，并保留其核心语义。输出仅包含重写后的 prompt 文本。'
+  rewrite_user_instruction: '请重写以下 prompt，并保留其核心语义。输出仅包含重写后的 prompt 文本，目标是生成使用 Python z3 库的 Python 代码。'
 
 llm:
   base_url: 'https://api.siliconflow.cn/v1/chat/completions'

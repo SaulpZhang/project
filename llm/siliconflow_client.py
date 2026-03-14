@@ -86,7 +86,7 @@ class SiliconFlowClient:
 
 def load_generation_system_prompt(path: Optional[str]) -> str:
     default_prompt = (
-        "你是 SMT-LIB v2 代码生成器。你必须严格输出 SMT-LIB v2 代码，"
+        "你是 Python z3 代码生成器。你必须严格输出使用 z3 库的 Python 代码，"
         "不要输出额外解释。"
     )
     if not path:
@@ -105,12 +105,18 @@ def extract_smtlib_code(raw_output: str) -> str:
         return ""
 
     # Prefer fenced code block content when present.
-    match = re.search(r"```(?:smt2|smt|smt-lib)?\s*(.*?)```", raw_output, re.DOTALL | re.IGNORECASE)
+    match = re.search(r"```(?:python|py|smt2|smt|smt-lib)?\s*(.*?)```", raw_output, re.DOTALL | re.IGNORECASE)
     if match:
         return match.group(1).strip()
 
     # Remove a possible single leading or trailing fence when output is malformed.
-    cleaned = raw_output.replace("```smt2", "").replace("```smt", "").replace("```", "")
+    cleaned = (
+        raw_output.replace("```python", "")
+        .replace("```py", "")
+        .replace("```smt2", "")
+        .replace("```smt", "")
+        .replace("```", "")
+    )
     return cleaned.strip()
 
 
