@@ -71,7 +71,10 @@ venv.bak/
 *.sublime-workspace
 
 # macOS
+# macOS
+# Ignore macOS Finder metadata files everywhere
 .DS_Store
+**/.DS_Store
 
 # Windows
 Thumbs.db
@@ -107,4 +110,3 @@ local_settings.py
 
 cfg/prompt.txt
 
-.DS_Store
