@@ -32,8 +32,7 @@ if __name__ == "__main__":
     data_pairs = match_pairs.match_account_instructs(
         accounts_dir, instructs_dir, label_file
     )
-    print(f"Matched {len(data_pairs)} pairs of accounts and instructs.")
-    for account_path, instruct_path, label in data_pairs:
-        print(account_path, "<->", instruct_path, "label=", label)
+
+    
 
     
