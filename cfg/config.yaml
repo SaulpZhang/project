@@ -5,7 +5,7 @@ data_process:
   label_file: 'answer_valid_permission.json'
 
 runtime:
-  output_dir: './outputs/smtlib'
+  output_dir: './outputs'
   limit: 1
 
 prompt:

@@ -6,6 +6,8 @@
 2. 代码必须使用 `z3` Python 库（如 Solver、And、Or、Not、Bool、Int、String 等）。
 3. 约束应完整表达验证目标。
 4. 代码中应包含求解流程（如 `solver.check()`），必要时输出模型结果（如 `solver.model()`）。
+5. Python代码最后输出True或者False，表示验证结果。
+6. 确保生成的 Python 代码语法正确且可执行。
 
 账户信息(JSON):
 {account_json}

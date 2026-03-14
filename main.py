@@ -47,7 +47,7 @@ if __name__ == "__main__":
 
     llm_client = SiliconFlowClient.from_config(llm_config)
 
-    output_dir_value = args.output_dir if args.output_dir is not None else runtime_config.get("output_dir", "./outputs/smtlib")
+    output_dir_value = args.output_dir if args.output_dir is not None else runtime_config.get("output_dir", "./outputs")
     output_dir = Path(output_dir_value)
     output_dir.mkdir(parents=True, exist_ok=True)
 
