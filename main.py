@@ -75,22 +75,22 @@ if __name__ == "__main__":
             f.write(smtlib_code)
 
         print(f"generated: {out_path}")
-    run_results = []
+
     if args.mode in (1,):
         run_results = script_runner.run_py_files_in_dir(output_dir.as_posix())
     
-    check_results_path = output_dir / "check_results.json"
-    check_results_json_data = {}
-    for i, res in enumerate(run_results):
-        check_results_json_data[res["file"]] = {
-            "result": res["result"],
-            "label": data_pairs[i][2],
-        }
-        print(f"File: {res['file']}")
-        print(f"Result: {res['result']}")
-        print(f"Label: {data_pairs[i][2]}")
-        print("-" * 20)
+        check_results_path = output_dir / "check_results.json"
+        check_results_json_data = {}
+        for i, res in enumerate(run_results):
+            check_results_json_data[res["file"]] = {
+                "result": res["result"],
+                "label": data_pairs[i][2],
+            }
+            print(f"File: {res['file']}")
+            print(f"Result: {res['result']}")
+            print(f"Label: {data_pairs[i][2]}")
+            print("-" * 20)
 
 
-    with open(check_results_path, "w") as f:
-        json.dump(check_results_json_data, f)
+        with open(check_results_path, "w") as f:
+            json.dump(check_results_json_data, f)
