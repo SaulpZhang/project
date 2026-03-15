@@ -4,6 +4,9 @@ import contextlib
 from io import StringIO
 from typing import List, Dict, Any
 from data_processing.match_pairs import get_key
+import log.get_log
+
+logger_console = log.get_log.get_console_logger(__file__)
 
 
 def run_py_files_in_dir(directory: str) -> List[Dict[str, Any]]:
@@ -13,12 +16,19 @@ def run_py_files_in_dir(directory: str) -> List[Dict[str, Any]]:
     Each dict contains: `file`, `stdout`, `result`.
     Exceptions are captured and returned in the `result` field as strings.
     """
-    base = Path(directory)
-    if not base.exists() or not base.is_dir():
-        raise FileNotFoundError(f"Directory not found: {base}")
-
+    py_files = []
     results: List[Dict[str, Any]] = []
-    py_files = sorted([p for p in base.iterdir() if p.suffix == ".py"], key=get_key)
+    base = Path(directory)
+    if not base.exists():
+        logger_console.info(f"Directory {directory} does not exist. No files to run.")
+        return results
+    if base.is_dir():
+        py_files = sorted([p for p in base.iterdir() if p.suffix == ".py"], key=get_key)
+    elif base.is_file() and base.suffix == ".py":
+        py_files = [base]
+    
+    logger_console.info(f"Found {len(py_files)} .py files in {directory} to run.")
+
     for p in py_files:
         buf = StringIO()
         globals_dict: Dict[str, Any] = {}

@@ -11,6 +11,27 @@ import argparse
 from pathlib import Path
 from utils import script_runner
 import json
+from tqdm import tqdm
+import log.get_log
+
+logger_console = log.get_log.get_console_logger(__file__)
+logger_file = log.get_log.get_file_logger(__file__ + "file")
+
+def generate_code(prompt_config, llm_config, llm_client, output_dir, account_path, instruct_path):
+    account_data, instruct_data = extract_data.extract_data(account_path, instruct_path)
+
+    base_prompt = build_generation_prompt(account_data, instruct_data, prompt_config)
+    final_prompt = rewrite_prompt_with_llm(base_prompt, prompt_config, llm_config, llm_client)
+    smtlib_code = generate_smtlib_code(final_prompt, llm_config, llm_client)
+
+    out_name = f"{Path(account_path).stem}.py"
+    out_path = output_dir / out_name
+    with open(out_path, "w", encoding="utf-8") as f:
+        f.write(smtlib_code)
+    
+    logger_console.info(f"Generated code is {out_path}")
+
+    return out_path
 
 
 if __name__ == "__main__":
@@ -20,7 +41,7 @@ if __name__ == "__main__":
     argsParser.add_argument("--label_file", type=str, default=None)
     argsParser.add_argument("--output_dir", type=str, default=None)
     argsParser.add_argument("--limit", type=int, default=None, help="Only process first N samples when > 0")
-    argsParser.add_argument("--mode", type=int, default=2, help="0: generation only; 1: generation + run, 2: run only")
+    argsParser.add_argument("--mode", nargs='+', type=int, default=[2], help="1: generation 2: run")
     args = argsParser.parse_args()
 
     with open("cfg/config.yaml", "r") as f:
@@ -30,7 +51,6 @@ if __name__ == "__main__":
     runtime_config = config.get("runtime", {})
     prompt_config = config.get("prompt", {})
     llm_config = config.get("llm", {})
-
 
     data_base_dir = data_process_config.get("data_base_dir")
 
@@ -59,38 +79,21 @@ if __name__ == "__main__":
     if limit and limit > 0:
         data_pairs = data_pairs[: limit]
 
-    for account_path, instruct_path, _label in data_pairs:
-        if args.mode == 2:
-            print(f"Skipping generation due to mode=2")
-            break
-        account_data, instruct_data = extract_data.extract_data(account_path, instruct_path)
+    if 1 in args.mode:
+        logger_console.info(f"Starting code generation for {len(data_pairs)} data pairs...")
+        for account_path, instruct_path, _label in tqdm(data_pairs, desc="Processing data pairs"):
+            out_path = generate_code(prompt_config, llm_config, llm_client, output_dir, account_path, instruct_path)
 
-        base_prompt = build_generation_prompt(account_data, instruct_data, prompt_config)
-        final_prompt = rewrite_prompt_with_llm(base_prompt, prompt_config, llm_config, llm_client)
-        smtlib_code = generate_smtlib_code(final_prompt, llm_config, llm_client)
 
-        out_name = f"{Path(account_path).stem}.py"
-        out_path = output_dir / out_name
-        with open(out_path, "w", encoding="utf-8") as f:
-            f.write(smtlib_code)
+            logger_console.info(f"Run results for {out_path}:")
+            run_results = script_runner.run_py_files_in_dir(out_path.as_posix())
 
-        print(f"generated: {out_path}")
-
-    if args.mode in (1,):
-        run_results = script_runner.run_py_files_in_dir(output_dir.as_posix())
+            for res in run_results:
+                logger_file.info(f"File: {res['file']}, Stdout: {res['stdout']}, Result: {res['result']}, Label: {_label}")
     
-        check_results_path = output_dir / "check_results.json"
-        check_results_json_data = {}
+    elif 2 in args.mode:
+        logger_console.info(f"Starting to run generated code in {output_dir}...")
+        run_results = script_runner.run_py_files_in_dir(output_dir.as_posix())
+
         for i, res in enumerate(run_results):
-            check_results_json_data[res["file"]] = {
-                "result": res["result"],
-                "label": data_pairs[i][2],
-            }
-            print(f"File: {res['file']}")
-            print(f"Result: {res['result']}")
-            print(f"Label: {data_pairs[i][2]}")
-            print("-" * 20)
-
-
-        with open(check_results_path, "w") as f:
-            json.dump(check_results_json_data, f)
+            logger_file.info(f"File: {res['file']}, Stdout: {res['stdout']}, Result: {res['result']}, Label: {data_pairs[i][2]}")
