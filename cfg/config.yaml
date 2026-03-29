@@ -6,12 +6,17 @@ data_process:
 
 runtime:
   output_dir: './outputs'
-  limit: 1
-  samples_per_case: 1
-  pass_k: 1
+  limit: 10000
+  samples_per_case: 5
+  pass_k: 5
 
 prompt:
   base_prompt_template_path: './prompt/base_prompt_template.txt'
+  generation_mode_mapping:
+    0: generation_zero_shot_system_path
+    1: generation_one_shot_system_path
+    2: generation_few_shot_system_path
+    3: generation_cot_system_path
   generation_zero_shot_system_path: './prompt/generation_zero_shot_system.txt'
   generation_one_shot_system_path: './prompt/generation_one_shot_system.txt'
   generation_few_shot_system_path: './prompt/generation_few_shot_system.txt'
@@ -24,7 +29,7 @@ llm:
   request_timeout: 120
 
   generation_model: 'Qwen/Qwen2.5-Coder-32B-Instruct'
-  generation_temperature: 0.1
+  generation_temperature: 0.6
   generation_max_tokens: 4096
   generate_mode: 0
   regenerate_enabled: false

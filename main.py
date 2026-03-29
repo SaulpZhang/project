@@ -41,19 +41,29 @@ def generate_code(
     return out_path, success, error_msg, retries_used, generation_time_sec
 
 
-if __name__ == "__main__":
+def get_args():
     argsParser = argparse.ArgumentParser(description="Natural language to SMT-LIB V2 code")
     argsParser.add_argument("--account_dir", type=str, default=None)
     argsParser.add_argument("--instruct_dir", type=str, default=None)
     argsParser.add_argument("--label_file", type=str, default=None)
     argsParser.add_argument("--output_dir", type=str, default=None)
     argsParser.add_argument("--limit", type=int, default=None, help="Only process first N samples when > 0")
+    argsParser.add_argument("--generate_mode", type=int, default=0, help="0: zero-shot, 1: one-shot, 2: few-shot, 3: chain-of-thought")
 
     args = argsParser.parse_args()
+    return args
+
+def update_config(args, base_config):
+    if args.generate_mode is not None:
+        base_config["llm"]["generate_mode"] = args.generate_mode
+
+if __name__ == "__main__":
+    args = get_args()
 
     with open("cfg/config.yaml", "r") as f:
         config = yaml.safe_load(f)
-
+        update_config(args, config)
+    
     data_process_config = config.get("data_process", {})
     runtime_config = config.get("runtime", {})
     prompt_config = config.get("prompt", {})

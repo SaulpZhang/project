@@ -1,6 +1,6 @@
 import json
 from pathlib import Path
-from typing import Dict, Optional
+from typing import Any, Dict, Optional
 
 
 def _to_pretty_json(data: Any) -> str:
@@ -13,12 +13,7 @@ def load_prompt_file(path: str) -> str:
 
 
 def get_generation_system_prompt_by_mode(generate_mode: int, prompt_config: Dict) -> str:
-    mode_mapping = {
-        0: "generation_zero_shot_system_path",
-        1: "generation_one_shot_system_path",
-        2: "generation_few_shot_system_path",
-        3: "generation_cot_system_path",
-    }
+    mode_mapping = prompt_config.get("generation_mode_mapping", {})
     if generate_mode not in mode_mapping:
         raise ValueError(f"Invalid generate_mode: {generate_mode}. Must be 0, 1, 2, or 3.")
 
