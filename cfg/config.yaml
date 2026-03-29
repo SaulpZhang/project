@@ -12,6 +12,7 @@ runtime:
 
 prompt:
   base_prompt_template_path: './prompt/base_prompt_template.txt'
+  smt_base_prompt_template_path: './prompt/smt_base_prompt_template.txt'
   generation_mode_mapping:
     0: generation_zero_shot_system_path
     1: generation_one_shot_system_path
@@ -21,7 +22,13 @@ prompt:
   generation_one_shot_system_path: './prompt/generation_one_shot_system.txt'
   generation_few_shot_system_path: './prompt/generation_few_shot_system.txt'
   generation_cot_system_path: './prompt/generation_cot_system.txt'
+
+  smt_generation_zero_shot_system_path: './prompt/smt_generation_zero_shot_system.txt'
+  smt_generation_one_shot_system_path: './prompt/smt_generation_one_shot_system.txt'
+  smt_generation_few_shot_system_path: './prompt/smt_generation_few_shot_system.txt'
+  smt_generation_cot_system_path: './prompt/smt_generation_cot_system.txt'
   regenerate_error_repair_path: './prompt/regenerate_error_repair.txt'
+  smt_regenerate_error_repair_path: './prompt/smt_regenerate_error_repair.txt'
 
 llm:
   base_url: 'https://api.siliconflow.cn/v1/chat/completions'
@@ -34,3 +41,4 @@ llm:
   generate_mode: 0
   regenerate_enabled: false
   regenerate_max_retries: 3
+  generate_code_language: 0

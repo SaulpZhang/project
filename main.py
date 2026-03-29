@@ -49,6 +49,7 @@ def get_args():
     argsParser.add_argument("--output_dir", type=str, default=None)
     argsParser.add_argument("--limit", type=int, default=None, help="Only process first N samples when > 0")
     argsParser.add_argument("--generate_mode", type=int, default=0, help="0: zero-shot, 1: one-shot, 2: few-shot, 3: chain-of-thought")
+    argsParser.add_argument("--generate_code_language", type=int, default=0, help="0: Python (z3), 1: SMT-LIB V2")
 
     args = argsParser.parse_args()
     return args
@@ -56,6 +57,15 @@ def get_args():
 def update_config(args, base_config):
     if args.generate_mode is not None:
         base_config["llm"]["generate_mode"] = args.generate_mode
+    if args.generate_code_language is not None:
+        base_config["llm"]["generate_code_language"] = args.generate_code_language
+        if args.generate_code_language == 1:
+            base_config["prompt"]['generation_mode_mapping'].update({
+                0: "smt_generation_zero_shot_system_path",
+                1: "smt_generation_one_shot_system_path",
+                2: "smt_generation_few_shot_system_path",
+                3: "smt_generation_cot_system_path",
+            })
 
 if __name__ == "__main__":
     args = get_args()

@@ -25,10 +25,11 @@ class CodeGenerator:
         self.prompt_config = prompt_config
         
         self.generate_mode = int(llm_config.get("generate_mode", 0))
+        self.generate_code_language = int(llm_config.get("generate_code_language", 0))
         self.regenerate_enabled = llm_config.get("regenerate_enabled", True)
         self.regenerate_max_retries = int(llm_config.get("regenerate_max_retries", 3))
         
-        logger.info(f"CodeGenerator initialized - generate_mode: {self.generate_mode}, regenerate_enabled: {self.regenerate_enabled}, max_retries: {self.regenerate_max_retries}")
+        logger.info(f"CodeGenerator initialized - generate_mode: {self.generate_mode}, generate_code_language: {self.generate_code_language}, regenerate_enabled: {self.regenerate_enabled}, max_retries: {self.regenerate_max_retries}")
     
     def generate_code(
         self,
@@ -56,6 +57,7 @@ class CodeGenerator:
             instruct_data=instruct_data,
             prompt_config=self.prompt_config,
             generate_mode=self.generate_mode,
+            generate_code_language=self.generate_code_language,
         )
         
         # Generate code
@@ -186,6 +188,25 @@ class CodeGenerator:
     
     def _execute_code(self, code: str) -> Tuple[bool, Optional[str]]:
         """
+        Execute generated code (Python or SMT-LIB V2) and check for errors.
+        
+        Args:
+            code: The code to execute (Python or SMT-LIB V2)
+            
+        Returns:
+            Tuple of (success, error_message)
+            - success: True if code executed successfully
+            - error_message: Error message if failed, None if successful
+        """
+        if self.generate_code_language == 1:
+            # Execute SMT-LIB V2 code
+            return self._execute_smt_code(code)
+        else:
+            # Execute Python (z3) code
+            return self._execute_python_code(code)
+    
+    def _execute_python_code(self, code: str) -> Tuple[bool, Optional[str]]:
+        """
         Execute generated Python code and check for errors.
         
         Args:
@@ -193,11 +214,9 @@ class CodeGenerator:
             
         Returns:
             Tuple of (success, error_message)
-            - success: True if code executed successfully
-            - error_message: Error message if failed, None if successful
         """
         try:
-            logger.debug("Executing code in isolated namespace")
+            logger.debug("Executing Python code in isolated namespace")
             # Create a local namespace for code execution with common libraries
             local_namespace = {}
             global_namespace = {
@@ -219,6 +238,89 @@ class CodeGenerator:
         except Exception as e:
             error_msg = f"{type(e).__name__}: {str(e)}\n{traceback.format_exc()}"
             logger.error(f"Code execution failed: {error_msg}")
+            return False, error_msg
+    
+    def _execute_smt_code(self, code: str) -> Tuple[bool, Optional[str]]:
+        """
+        Execute generated SMT-LIB V2 code and check for errors.
+        
+        Args:
+            code: The SMT-LIB V2 code to execute
+            
+        Returns:
+            Tuple of (success, error_message)
+        """
+        try:
+            import tempfile
+            import subprocess
+            
+            logger.debug("Executing SMT-LIB V2 code")
+            
+            # Write SMT code to a temporary file
+            with tempfile.NamedTemporaryFile(mode='w', suffix='.smt2', delete=False, encoding='utf-8') as f:
+                f.write(code)
+                temp_file = f.name
+            
+            try:
+                # Try to use z3 command line tool if available
+                result = subprocess.run(
+                    ['z3', '-smt2', temp_file],
+                    capture_output=True,
+                    text=True,
+                    timeout=30
+                )
+                
+                output = result.stdout.strip()
+                logger.debug(f"SMT solver output: {output}")
+                
+                # Check if the solver returned 'sat', 'unsat', or 'unknown'
+                if 'sat' in output or 'unsat' in output or 'unknown' in output:
+                    logger.info("SMT-LIB V2 code executed successfully")
+                    return True, None
+                else:
+                    error_msg = f"SMT solver returned unexpected output: {output}"
+                    logger.warning(error_msg)
+                    return False, error_msg
+                    
+            except FileNotFoundError:
+                # z3 command line tool not available, try using z3 Python API
+                logger.debug("z3 command-line tool not found, using z3 Python API as fallback")
+                return self._execute_smt_with_python_z3(code)
+            finally:
+                # Clean up temp file
+                import os
+                try:
+                    os.unlink(temp_file)
+                except:
+                    pass
+                    
+        except Exception as e:
+            error_msg = f"{type(e).__name__}: {str(e)}\n{traceback.format_exc()}"
+            logger.error(f"SMT execution failed: {error_msg}")
+            return False, error_msg
+    
+    def _execute_smt_with_python_z3(self, code: str) -> Tuple[bool, Optional[str]]:
+        """
+        Execute SMT-LIB V2 code using z3 Python API.
+        
+        Args:
+            code: The SMT-LIB V2 code to execute
+            
+        Returns:
+            Tuple of (success, error_message)
+        """
+        try:
+            import z3
+            
+            # Use z3.parse_smt2_string to parse and execute SMT code
+            logger.debug("Parsing SMT code with z3 Python API")
+            z3.parse_smt2_string(code)
+            logger.info("SMT-LIB V2 code parsed and executed successfully")
+            return True, None
+            
+        except Exception as e:
+            error_msg = f"{type(e).__name__}: {str(e)}\n{traceback.format_exc()}"
+            logger.error(f"SMT execution with z3 API failed: {error_msg}")
             return False, error_msg
     
     def _regenerate_with_error_handling(
@@ -254,6 +356,7 @@ class CodeGenerator:
                 error=error_message,
                 prompt_config=self.prompt_config,
                 generate_mode=self.generate_mode,
+                generate_code_language=self.generate_code_language,
                 account_data=account_data,
                 instruct_data=instruct_data,
             )
