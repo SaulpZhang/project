@@ -27,5 +27,5 @@ llm:
   generation_temperature: 0.1
   generation_max_tokens: 4096
   generate_mode: 0
-  regenerate_enabled: true
+  regenerate_enabled: false
   regenerate_max_retries: 3

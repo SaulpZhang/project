@@ -65,7 +65,10 @@ class CodeGenerator:
             logger.error("Failed to generate code from LLM")
             return "", False, "Failed to generate code from LLM", 0
         
-        
+        if not self.regenerate_enabled:
+            return generated_code, True, None, 0
+
+
         # Try to execute the code
 
         success, error_msg = self._execute_code(generated_code)
