@@ -111,3 +111,5 @@ local_settings.py
 cfg/prompt.txt
 
 outputs/*
+
+cfg/cmd.txt
