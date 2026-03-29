@@ -73,7 +73,7 @@ def update_config(args, base_config):
             })
 
     if args.regenerate_enabled is not None:
-        base_config["llm"]["regenerate_enabled"] = _str_to_bool(args.regenerate_enabled)
+        base_config["llm"]["regenerate_enabled"] = args.regenerate_enabled
 
 if __name__ == "__main__":
     args = get_args()
