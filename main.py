@@ -20,6 +20,7 @@ def generate_code(
     account_path: str,
     instruct_path: str,
     sample_idx: int,
+    generate_code_language: int = 0,
 ):
     account_data, instruct_data = extract_data.extract_data(account_path, instruct_path)
 
@@ -27,7 +28,9 @@ def generate_code(
     generated_code, success, error_msg, retries_used = code_gen.generate_code(account_data, instruct_data)
     generation_time_sec = time.perf_counter() - start_time
 
-    out_name = f"{Path(account_path).stem}_s{sample_idx}.py"
+    # Use .smt2 for SMT code, .py for Python code
+    file_suffix = ".smt2" if generate_code_language == 1 else ".py"
+    out_name = f"{Path(account_path).stem}_s{sample_idx}{file_suffix}"
     out_path = output_dir / out_name
     with open(out_path, "w", encoding="utf-8") as f:
         f.write(generated_code)
@@ -70,7 +73,7 @@ def update_config(args, base_config):
             })
 
     if args.regenerate_enabled is not None:
-        base_config["llm"]["regenerate_enabled"] = args.regenerate_enabled
+        base_config["llm"]["regenerate_enabled"] = _str_to_bool(args.regenerate_enabled)
 
 if __name__ == "__main__":
     args = get_args()
@@ -134,18 +137,27 @@ if __name__ == "__main__":
         logger_console.info(f"Processing case {case_idx}/{len(data_pairs)}: {case_id}")
 
         for sample_idx in range(1, samples_per_case + 1):
+            generate_code_language = llm_config.get("generate_code_language", 0)
             out_path, success, error_msg, retries_used, generation_time_sec = generate_code(
                 code_gen=code_gen,
                 output_dir=output_dir,
                 account_path=account_path,
                 instruct_path=instruct_path,
                 sample_idx=sample_idx,
+                generate_code_language=generate_code_language,
             )
 
             run_result = None
             run_stdout = ""
             if success:
-                run_results = script_runner.run_py_files_in_dir(out_path.as_posix())
+                # Execute code based on language type
+                if generate_code_language == 1:
+                    # SMT-LIB V2 code
+                    run_results = script_runner.run_smt_files_in_dir(out_path.as_posix())
+                else:
+                    # Python (z3) code
+                    run_results = script_runner.run_py_files_in_dir(out_path.as_posix())
+                
                 if run_results:
                     run_result = run_results[0].get("result")
                     run_stdout = run_results[0].get("stdout", "")

@@ -103,3 +103,104 @@ def run_py_files_in_dir(directory: str) -> List[Dict[str, Any]]:
             results.append({"file": p.name, "stdout": buf.getvalue(), "result": f"error: {e!r}"})
 
     return results
+
+
+def run_smt_files_in_dir(directory: str) -> List[Dict[str, Any]]:
+    """Run all .smt2 files in `directory` (non-recursive) using z3 solver.
+
+    Each dict contains: `file`, `stdout`, `result` (True for sat, False for unsat).
+    Exceptions are captured and returned in the `result` field as strings.
+    """
+    smt_files = []
+    results: List[Dict[str, Any]] = []
+    base = Path(directory)
+    if not base.exists():
+        logger_console.info(f"Directory {directory} does not exist. No files to run.")
+        return results
+    if base.is_dir():
+        smt_files = sorted([p for p in base.iterdir() if p.suffix == ".smt2"], key=get_key)
+    elif base.is_file() and base.suffix == ".smt2":
+        smt_files = [base]
+    
+    logger_console.info(f"Found {len(smt_files)} .smt2 files in {directory} to run.")
+
+    for p in smt_files:
+        try:
+            with open(p, 'r', encoding='utf-8') as f:
+                smt_code = f.read()
+            
+            # Try to execute SMT code using z3
+            result = execute_smt_code(smt_code)
+            results.append({"file": p.name, "stdout": "", "result": result})
+            
+        except Exception as e:
+            results.append({"file": p.name, "stdout": "", "result": f"error: {e!r}"})
+
+    return results
+
+
+def execute_smt_code(code: str) -> Any:
+    """Execute SMT-LIB V2 code and return the satisfiability result.
+    
+    Args:
+        code: SMT-LIB V2 code to execute
+        
+    Returns:
+        True for sat, False for unsat, or error string if execution failed
+    """
+    try:
+        import z3
+        import tempfile
+        import subprocess
+        
+        # Try to use z3 command line tool first
+        with tempfile.NamedTemporaryFile(mode='w', suffix='.smt2', delete=False, encoding='utf-8') as f:
+            f.write(code)
+            temp_file = f.name
+        
+        try:
+            # Try z3 CLI first
+            result = subprocess.run(
+                ['z3', '-smt2', temp_file],
+                capture_output=True,
+                text=True,
+                timeout=30
+            )
+            
+            output = result.stdout.strip()
+            
+            # Check if the solver returned 'sat', 'unsat', or 'unknown'
+            output_lower = output.lower()
+            if output_lower == 'unsat':
+                return False
+            elif output_lower == 'sat':
+                return True
+            elif 'unsat' in output_lower:
+                # More lenient check - if unsat appears anywhere
+                return False
+            elif 'sat' in output_lower:
+                # More lenient check - if sat appears anywhere (but not unsat)
+                return True
+            else:
+                return f"Unknown result: {output}"
+                
+        except FileNotFoundError:
+            # z3 CLI not available, try z3 Python API
+            logger_console.debug("z3 CLI not found, using z3 Python API")
+            # Use z3 Python API to parse and check SMT code
+            z3.parse_smt2_string(code)
+            # If we can parse it without error, consider it valid
+            # Note: This doesn't actually run the solver, just parses the code
+            return None  # Return None to indicate parse-only success
+        finally:
+            # Clean up temp file
+            import os
+            try:
+                os.unlink(temp_file)
+            except:
+                pass
+                
+    except ImportError:
+        return "error: z3 library not available"
+    except Exception as e:
+        return f"error: {e!r}"
