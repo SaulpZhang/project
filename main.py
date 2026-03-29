@@ -12,7 +12,7 @@ import log.get_log
 import time
 
 logger_console = log.get_log.get_console_logger(__file__)
-logger_file = log.get_log.get_file_logger(__file__ + "file")
+
 
 def generate_code(
     code_gen: CodeGenerator,
@@ -50,6 +50,7 @@ def get_args():
     argsParser.add_argument("--limit", type=int, default=None, help="Only process first N samples when > 0")
     argsParser.add_argument("--generate_mode", type=int, default=0, help="0: zero-shot, 1: one-shot, 2: few-shot, 3: chain-of-thought")
     argsParser.add_argument("--generate_code_language", type=int, default=0, help="0: Python (z3), 1: SMT-LIB V2")
+    argsParser.add_argument("--regenerate_enabled", type=bool, default=False, help="Whether to enable regenerate mechanism when generation fails")
 
     args = argsParser.parse_args()
     return args
@@ -57,6 +58,7 @@ def get_args():
 def update_config(args, base_config):
     if args.generate_mode is not None:
         base_config["llm"]["generate_mode"] = args.generate_mode
+
     if args.generate_code_language is not None:
         base_config["llm"]["generate_code_language"] = args.generate_code_language
         if args.generate_code_language == 1:
@@ -66,6 +68,9 @@ def update_config(args, base_config):
                 2: "smt_generation_few_shot_system_path",
                 3: "smt_generation_cot_system_path",
             })
+
+    if args.regenerate_enabled is not None:
+        base_config["llm"]["regenerate_enabled"] = args.regenerate_enabled
 
 if __name__ == "__main__":
     args = get_args()
@@ -160,7 +165,7 @@ if __name__ == "__main__":
             }
             generation_records.append(record)
 
-            logger_file.info(
+            logger_console.info(
                 f"Case={case_id}, Sample=s{sample_idx}, Output={out_path.name}, "
                 f"Label={bool(label)}, GenSuccess={success}, RunResult={run_result}, "
                 f"Retries={retries_used}, TimeSec={generation_time_sec:.3f}, "

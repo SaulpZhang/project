@@ -73,7 +73,7 @@ def compute_metrics(records: List[Dict[str, Any]], pass_k: int) -> Dict[str, Any
 
 
 def save_generation_records(records: List[Dict[str, Any]], output_dir: Path) -> Path:
-    path = output_dir / "generation_records.json"
+    path = output_dir / "generation_records.jsonl"
     with open(path, "w", encoding="utf-8") as f:
         for rec in records:
             f.write(json.dumps(rec, ensure_ascii=False) + "\n")

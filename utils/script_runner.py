@@ -9,6 +9,63 @@ import log.get_log
 logger_console = log.get_log.get_console_logger(__file__)
 
 
+def _normalize_value_for_json(value: Any) -> Any:
+    """
+    Convert z3 objects and other non-JSON-serializable types to JSON-serializable Python types.
+    
+    Args:
+        value: The value to normalize
+        
+    Returns:
+        A JSON-serializable Python value
+    """
+    if value is None:
+        return None
+    
+    # Handle z3 objects
+    try:
+        import z3
+        
+        # Check if it's a z3 BoolRef or other z3 expression
+        if isinstance(value, (z3.BoolRef, z3.ExprRef, z3.FuncDeclRef)):
+            # Try to convert to string and then to Python type
+            str_val = str(value)
+            if str_val == "True":
+                return True
+            elif str_val == "False":
+                return False
+            elif str_val == "sat":
+                return True
+            elif str_val == "unsat":
+                return False
+            else:
+                # Return string representation
+                return str_val
+        
+        # Check for z3 CheckSatResult
+        if hasattr(z3, 'CheckSatResult') and isinstance(value, z3.CheckSatResult):
+            result_str = str(value)
+            if result_str == "sat":
+                return True
+            elif result_str == "unsat":
+                return False
+            else:
+                return result_str
+                
+    except ImportError:
+        pass
+    
+    # If it's already a basic type, return as is
+    if isinstance(value, (bool, int, float, str, list, dict, type(None))):
+        return value
+    
+    # For other types, try string conversion
+    try:
+        return str(value)
+    except:
+        return repr(value)
+
+
 def run_py_files_in_dir(directory: str) -> List[Dict[str, Any]]:
     """Run all .py files in `directory` (non-recursive), capture stdout and a
     `result` variable if present, and return a list of dicts with the outputs.
@@ -37,10 +94,8 @@ def run_py_files_in_dir(directory: str) -> List[Dict[str, Any]]:
                 globals_dict = runpy.run_path(str(p))
             out = buf.getvalue()
             res = globals_dict.get("result")
-            if str(res) == "sat":
-                res = True
-            elif str(res) == "unsat":
-                res = False
+            # Normalize z3 and other non-JSON-serializable objects
+            res = _normalize_value_for_json(res)
             results.append({"file": p.name, "stdout": out, "result": res})
         except ModuleNotFoundError as e:
             results.append({"file": p.name, "stdout": buf.getvalue(), "result": f"error: missing module {e.name}"})
