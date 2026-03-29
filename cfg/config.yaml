@@ -7,23 +7,25 @@ data_process:
 runtime:
   output_dir: './outputs'
   limit: 1
+  samples_per_case: 1
+  pass_k: 1
 
 prompt:
-  base_prompt_template_path: './cfg/prompt_template.txt'
-  rewrite_enabled: true
-  rewrite_system_prompt_path: './prompt/prompt_rewrite_system.txt'
-  rewrite_user_instruction: '请重写以下 prompt，并保留其核心语义。输出仅包含重写后的 prompt 文本，目标是生成使用 Python z3 库的 Python 代码。'
+  base_prompt_template_path: './prompt/base_prompt_template.txt'
+  generation_zero_shot_system_path: './prompt/generation_zero_shot_system.txt'
+  generation_one_shot_system_path: './prompt/generation_one_shot_system.txt'
+  generation_few_shot_system_path: './prompt/generation_few_shot_system.txt'
+  generation_cot_system_path: './prompt/generation_cot_system.txt'
+  regenerate_error_repair_path: './prompt/regenerate_error_repair.txt'
 
 llm:
   base_url: 'https://api.siliconflow.cn/v1/chat/completions'
   api_key_env: 'sk-ziwfobfdevetcibhytppdcakzxaenrhvexfdbcznpwtjiqjt'
   request_timeout: 120
 
-  rewrite_model: 'Pro/Qwen/Qwen2.5-7B-Instruct'
-  rewrite_temperature: 0.1
-  rewrite_max_tokens: 4096
-
   generation_model: 'Qwen/Qwen2.5-Coder-32B-Instruct'
   generation_temperature: 0.1
   generation_max_tokens: 4096
-  generation_system_prompt_path: './prompt/smt_generation_system.txt'
+  generate_mode: 0
+  regenerate_enabled: true
+  regenerate_max_retries: 3

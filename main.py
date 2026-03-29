@@ -1,37 +1,44 @@
 import yaml
 import data_processing.match_pairs as match_pairs
 import data_processing.extract_data as extract_data
-from prompt_generation.prompt_builder import (
-    build_generation_prompt,
-    rewrite_prompt_with_llm,
-)
-from llm.siliconflow_client import SiliconFlowClient, generate_smtlib_code
+from llm.siliconflow_client import SiliconFlowClient
+from llm.code_generator import CodeGenerator
 import os
 import argparse
 from pathlib import Path
 from utils import script_runner
-import json
-from tqdm import tqdm
+from eva.statistics import compute_metrics, save_generation_records, save_metrics
 import log.get_log
+import time
 
 logger_console = log.get_log.get_console_logger(__file__)
 logger_file = log.get_log.get_file_logger(__file__ + "file")
 
-def generate_code(prompt_config, llm_config, llm_client, output_dir, account_path, instruct_path):
+def generate_code(
+    code_gen: CodeGenerator,
+    output_dir: Path,
+    account_path: str,
+    instruct_path: str,
+    sample_idx: int,
+):
     account_data, instruct_data = extract_data.extract_data(account_path, instruct_path)
 
-    base_prompt = build_generation_prompt(account_data, instruct_data, prompt_config)
-    final_prompt = rewrite_prompt_with_llm(base_prompt, prompt_config, llm_config, llm_client)
-    smtlib_code = generate_smtlib_code(final_prompt, llm_config, llm_client)
+    start_time = time.perf_counter()
+    generated_code, success, error_msg, retries_used = code_gen.generate_code(account_data, instruct_data)
+    generation_time_sec = time.perf_counter() - start_time
 
-    out_name = f"{Path(account_path).stem}.py"
+    out_name = f"{Path(account_path).stem}_s{sample_idx}.py"
     out_path = output_dir / out_name
     with open(out_path, "w", encoding="utf-8") as f:
-        f.write(smtlib_code)
-    
-    logger_console.info(f"Generated code is {out_path}")
+        f.write(generated_code)
 
-    return out_path
+    status = "success" if success else "failed"
+    logger_console.info(
+        f"Generated code {status}: {out_path}, retries_used={retries_used}, "
+        f"generation_time_sec={generation_time_sec:.3f}"
+    )
+
+    return out_path, success, error_msg, retries_used, generation_time_sec
 
 
 if __name__ == "__main__":
@@ -41,7 +48,7 @@ if __name__ == "__main__":
     argsParser.add_argument("--label_file", type=str, default=None)
     argsParser.add_argument("--output_dir", type=str, default=None)
     argsParser.add_argument("--limit", type=int, default=None, help="Only process first N samples when > 0")
-    argsParser.add_argument("--mode", nargs='+', type=int, default=[2], help="1: generation 2: run")
+
     args = argsParser.parse_args()
 
     with open("cfg/config.yaml", "r") as f:
@@ -79,21 +86,75 @@ if __name__ == "__main__":
     if limit and limit > 0:
         data_pairs = data_pairs[: limit]
 
-    if 1 in args.mode:
-        logger_console.info(f"Starting code generation for {len(data_pairs)} data pairs...")
-        for account_path, instruct_path, _label in tqdm(data_pairs, desc="Processing data pairs"):
-            out_path = generate_code(prompt_config, llm_config, llm_client, output_dir, account_path, instruct_path)
+    samples_per_case = int(runtime_config.get("samples_per_case", 1))
+    if samples_per_case < 1:
+        logger_console.warning("runtime.samples_per_case must be >= 1, fallback to 1")
+        samples_per_case = 1
 
+    pass_k = int(runtime_config.get("pass_k", samples_per_case))
+    if pass_k < 1:
+        logger_console.warning("runtime.pass_k must be >= 1, fallback to 1")
+        pass_k = 1
 
-            logger_console.info(f"Run results for {out_path}:")
-            run_results = script_runner.run_py_files_in_dir(out_path.as_posix())
+    code_gen = CodeGenerator(llm_client, llm_config, prompt_config)
+    generation_records = []
 
-            for res in run_results:
-                logger_file.info(f"File: {res['file']}, Stdout: {res['stdout']}, Result: {res['result']}, Label: {_label}")
-    
-    elif 2 in args.mode:
-        logger_console.info(f"Starting to run generated code in {output_dir}...")
-        run_results = script_runner.run_py_files_in_dir(output_dir.as_posix())
+    logger_console.info(
+        f"Starting code generation for {len(data_pairs)} data pairs, "
+        f"samples_per_case={samples_per_case}, pass_k={pass_k}"
+    )
 
-        for i, res in enumerate(run_results):
-            logger_file.info(f"File: {res['file']}, Stdout: {res['stdout']}, Result: {res['result']}, Label: {data_pairs[i][2]}")
+    for case_idx, (account_path, instruct_path, label) in enumerate(data_pairs, start=1):
+        case_id = Path(account_path).stem
+        logger_console.info(f"Processing case {case_idx}/{len(data_pairs)}: {case_id}")
+
+        for sample_idx in range(1, samples_per_case + 1):
+            out_path, success, error_msg, retries_used, generation_time_sec = generate_code(
+                code_gen=code_gen,
+                output_dir=output_dir,
+                account_path=account_path,
+                instruct_path=instruct_path,
+                sample_idx=sample_idx,
+            )
+
+            run_result = None
+            run_stdout = ""
+            if success:
+                run_results = script_runner.run_py_files_in_dir(out_path.as_posix())
+                if run_results:
+                    run_result = run_results[0].get("result")
+                    run_stdout = run_results[0].get("stdout", "")
+
+            record = {
+                "case_id": case_id,
+                "account_path": account_path,
+                "instruct_path": instruct_path,
+                "label": bool(label),
+                "sample_idx": sample_idx,
+                "output_file": out_path.name,
+                "generation_success": bool(success),
+                "run_result": run_result,
+                "retries_used": retries_used,
+                "generation_time_sec": generation_time_sec,
+                "error_message": error_msg,
+            }
+            generation_records.append(record)
+
+            logger_file.info(
+                f"Case={case_id}, Sample=s{sample_idx}, Output={out_path.name}, "
+                f"Label={bool(label)}, GenSuccess={success}, RunResult={run_result}, "
+                f"Retries={retries_used}, TimeSec={generation_time_sec:.3f}, "
+                f"Stdout={run_stdout}, Error={error_msg}"
+            )
+
+    metrics = compute_metrics(generation_records, pass_k=pass_k)
+    save_generation_records(generation_records, output_dir)
+    save_metrics(metrics, output_dir)
+
+    logger_console.info(
+        f"Metrics summary: pass@{pass_k}={metrics.get('pass_at_k'):.4f}, "
+        f"generation_success_rate={metrics.get('generation_success_rate'):.4f}, "
+        f"avg_retries={metrics.get('avg_retries'):.4f}, "
+        f"avg_generation_time_sec={metrics.get('avg_generation_time_sec'):.4f}"
+    )
+

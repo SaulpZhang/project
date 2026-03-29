@@ -1,0 +1,13 @@
+请基于以下账户信息和验证目标，生成可执行的 Python z3 代码。
+
+必须满足：
+1. 只输出 Python 代码，不要输出解释文字。
+2. 必须使用 z3 Python 库构建约束并求解。
+3. 必须将最终布尔结论写入变量 result（True 或 False）。
+4. 不要使用顶层 return 语句。
+
+账户信息(JSON):
+{account_json}
+
+验证目标(自然语言):
+{instruct_text}
