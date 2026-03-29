@@ -4,8 +4,35 @@ import traceback
 from typing import Any, Dict, Optional, Tuple
 from log.get_log import get_console_logger
 from prompt_generation.prompt_builder import build_generation_prompt, build_regenerate_prompt
+from concurrent.futures import ThreadPoolExecutor, TimeoutError as FuturesTimeoutError
 
 logger = get_console_logger(__file__)
+
+# Global timeout setting (20 seconds)
+EXECUTION_TIMEOUT = 20
+
+
+def _run_code_with_timeout(func, *args, **kwargs) -> Any:
+    """
+    Execute a function with a timeout of EXECUTION_TIMEOUT seconds.
+    
+    Args:
+        func: The function to execute
+        *args: Positional arguments for func
+        **kwargs: Keyword arguments for func
+        
+    Returns:
+        The return value of func if it completes within timeout
+        
+    Raises:
+        TimeoutError if execution exceeds EXECUTION_TIMEOUT
+    """
+    with ThreadPoolExecutor(max_workers=1) as executor:
+        future = executor.submit(func, *args, **kwargs)
+        try:
+            return future.result(timeout=EXECUTION_TIMEOUT)
+        except FuturesTimeoutError:
+            raise TimeoutError(f"Code execution exceeded {EXECUTION_TIMEOUT} seconds timeout")
 
 
 class CodeGenerator:
@@ -208,6 +235,7 @@ class CodeGenerator:
     def _execute_python_code(self, code: str) -> Tuple[bool, Optional[str]]:
         """
         Execute generated Python code and check for errors.
+        Has a maximum timeout of 20 seconds.
         
         Args:
             code: The Python code to execute
@@ -215,7 +243,8 @@ class CodeGenerator:
         Returns:
             Tuple of (success, error_message)
         """
-        try:
+        def run_code():
+            """Wrapper function for executing code with timeout"""
             logger.debug("Executing Python code in isolated namespace")
             # Create a local namespace for code execution with common libraries
             local_namespace = {}
@@ -226,6 +255,10 @@ class CodeGenerator:
             }
             
             exec(code, global_namespace, local_namespace)
+            return local_namespace
+        
+        try:
+            local_namespace = _run_code_with_timeout(run_code)
             
             # Check if result variable was set
             if "result" in local_namespace:
@@ -235,6 +268,10 @@ class CodeGenerator:
                 error_msg = "Code executed but 'result' variable not set"
                 logger.warning(error_msg)
                 return False, error_msg
+        except TimeoutError as e:
+            error_msg = f"Timeout: {str(e)}"
+            logger.error(f"Code execution timed out: {error_msg}")
+            return False, error_msg
         except Exception as e:
             error_msg = f"{type(e).__name__}: {str(e)}\n{traceback.format_exc()}"
             logger.error(f"Code execution failed: {error_msg}")
@@ -243,6 +280,7 @@ class CodeGenerator:
     def _execute_smt_code(self, code: str) -> Tuple[bool, Optional[str]]:
         """
         Execute generated SMT-LIB V2 code and check for errors.
+        Has a maximum timeout of 20 seconds.
         
         Args:
             code: The SMT-LIB V2 code to execute
@@ -262,12 +300,12 @@ class CodeGenerator:
                 temp_file = f.name
             
             try:
-                # Try to use z3 command line tool if available
+                # Try to use z3 command line tool if available with 20 second timeout
                 result = subprocess.run(
                     ['z3', '-smt2', temp_file],
                     capture_output=True,
                     text=True,
-                    timeout=30
+                    timeout=EXECUTION_TIMEOUT
                 )
                 
                 output = result.stdout.strip()
@@ -282,6 +320,10 @@ class CodeGenerator:
                     logger.warning(error_msg)
                     return False, error_msg
                     
+            except subprocess.TimeoutExpired:
+                error_msg = f"SMT execution exceeded {EXECUTION_TIMEOUT} seconds timeout"
+                logger.error(error_msg)
+                return False, error_msg
             except FileNotFoundError:
                 # z3 command line tool not available, try using z3 Python API
                 logger.debug("z3 command-line tool not found, using z3 Python API as fallback")
@@ -302,6 +344,7 @@ class CodeGenerator:
     def _execute_smt_with_python_z3(self, code: str) -> Tuple[bool, Optional[str]]:
         """
         Execute SMT-LIB V2 code using z3 Python API.
+        Has a maximum timeout of 20 seconds.
         
         Args:
             code: The SMT-LIB V2 code to execute
@@ -309,15 +352,21 @@ class CodeGenerator:
         Returns:
             Tuple of (success, error_message)
         """
-        try:
+        def parse_and_execute():
+            """Wrapper function for parsing SMT code with timeout"""
             import z3
-            
-            # Use z3.parse_smt2_string to parse and execute SMT code
             logger.debug("Parsing SMT code with z3 Python API")
             z3.parse_smt2_string(code)
+            return True
+        
+        try:
+            _run_code_with_timeout(parse_and_execute)
             logger.info("SMT-LIB V2 code parsed and executed successfully")
             return True, None
-            
+        except TimeoutError as e:
+            error_msg = f"Timeout: {str(e)}"
+            logger.error(f"SMT execution with z3 API timed out: {error_msg}")
+            return False, error_msg
         except Exception as e:
             error_msg = f"{type(e).__name__}: {str(e)}\n{traceback.format_exc()}"
             logger.error(f"SMT execution with z3 API failed: {error_msg}")

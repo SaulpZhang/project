@@ -5,8 +5,35 @@ from io import StringIO
 from typing import List, Dict, Any
 from data_processing.match_pairs import get_key
 import log.get_log
+from concurrent.futures import ThreadPoolExecutor, TimeoutError as FuturesTimeoutError
 
 logger_console = log.get_log.get_console_logger(__file__)
+
+# Global timeout setting (20 seconds)
+EXECUTION_TIMEOUT = 20
+
+
+def _run_code_with_timeout(func, *args, **kwargs) -> Any:
+    """
+    Execute a function with a timeout of EXECUTION_TIMEOUT seconds.
+    
+    Args:
+        func: The function to execute
+        *args: Positional arguments for func
+        **kwargs: Keyword arguments for func
+        
+    Returns:
+        The return value of func if it completes within timeout
+        
+    Raises:
+        TimeoutError if execution exceeds EXECUTION_TIMEOUT
+    """
+    with ThreadPoolExecutor(max_workers=1) as executor:
+        future = executor.submit(func, *args, **kwargs)
+        try:
+            return future.result(timeout=EXECUTION_TIMEOUT)
+        except FuturesTimeoutError:
+            raise TimeoutError(f"Code execution exceeded {EXECUTION_TIMEOUT} seconds timeout")
 
 
 def _normalize_value_for_json(value: Any) -> Any:
@@ -72,6 +99,7 @@ def run_py_files_in_dir(directory: str) -> List[Dict[str, Any]]:
 
     Each dict contains: `file`, `stdout`, `result`.
     Exceptions are captured and returned in the `result` field as strings.
+    Code execution has a maximum timeout of 20 seconds.
     """
     py_files = []
     results: List[Dict[str, Any]] = []
@@ -89,14 +117,22 @@ def run_py_files_in_dir(directory: str) -> List[Dict[str, Any]]:
     for p in py_files:
         buf = StringIO()
         globals_dict: Dict[str, Any] = {}
-        try:
+        
+        def execute_file():
+            """Wrapper function for executing the file with timeout"""
             with contextlib.redirect_stdout(buf):
-                globals_dict = runpy.run_path(str(p))
+                return runpy.run_path(str(p))
+        
+        try:
+            globals_dict = _run_code_with_timeout(execute_file)
             out = buf.getvalue()
             res = globals_dict.get("result")
             # Normalize z3 and other non-JSON-serializable objects
             res = _normalize_value_for_json(res)
             results.append({"file": p.name, "stdout": out, "result": res})
+        except TimeoutError as e:
+            results.append({"file": p.name, "stdout": buf.getvalue(), "result": f"error: {str(e)}"})
+            logger_console.warning(f"File {p.name} execution timed out: {e}")
         except ModuleNotFoundError as e:
             results.append({"file": p.name, "stdout": buf.getvalue(), "result": f"error: missing module {e.name}"})
         except Exception as e:
@@ -142,6 +178,8 @@ def run_smt_files_in_dir(directory: str) -> List[Dict[str, Any]]:
 def execute_smt_code(code: str) -> Any:
     """Execute SMT-LIB V2 code and return the satisfiability result.
     
+    Has a maximum timeout of 20 seconds.
+    
     Args:
         code: SMT-LIB V2 code to execute
         
@@ -159,12 +197,12 @@ def execute_smt_code(code: str) -> Any:
             temp_file = f.name
         
         try:
-            # Try z3 CLI first
+            # Try z3 CLI first with 20 second timeout
             result = subprocess.run(
                 ['z3', '-smt2', temp_file],
                 capture_output=True,
                 text=True,
-                timeout=30
+                timeout=EXECUTION_TIMEOUT
             )
             
             output = result.stdout.strip()
@@ -184,6 +222,10 @@ def execute_smt_code(code: str) -> Any:
             else:
                 return f"Unknown result: {output}"
                 
+        except subprocess.TimeoutExpired:
+            error_msg = f"SMT execution exceeded {EXECUTION_TIMEOUT} seconds timeout"
+            logger_console.warning(error_msg)
+            return f"error: {error_msg}"
         except FileNotFoundError:
             # z3 CLI not available, try z3 Python API
             logger_console.debug("z3 CLI not found, using z3 Python API")
