@@ -161,6 +161,8 @@ def extract_account_data(path: str) -> Dict:
 def extract_instruct_data(path: str) -> Dict:
     instruct_json_data = extract_json_data(path)
     data = {}
+    data["scenario"] = instruct_json_data.get("scenario")
+    data["sub_scenario"] = instruct_json_data.get("sub_scenario")
     data["instruct"] = instruct_json_data["instruct"]
     return data
 
