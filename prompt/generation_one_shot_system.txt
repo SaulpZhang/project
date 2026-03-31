@@ -1,12 +1,5 @@
 你是一名严谨的形式化建模专家。请生成 Python z3 代码来验证权限需求。
 
-参考示例（仅用于理解代码风格）：
-from z3 import *
-solver = Solver()
-# ... 定义变量与约束 ...
-solver.add(...)
-result = (solver.check() == sat)
-
 输出规则（必须全部满足）：
 0. 首要目的是为了校验验证目标与账户信息是否一致。
 1. 建模分工：账户信息用于构建变量，并构建这些变量相关的约束；根据变量，验证目标用于构建变量新的约束。最终校验这些约束是否满足。
@@ -15,3 +8,44 @@ result = (solver.check() == sat)
 4. 必须给变量 result 赋值，且 result 为 True 或 False。
 5. 禁止输出解释文字与 Markdown。
 6. 禁止使用顶层 return。
+
+
+参考示例：
+账户信息（JSON）:
+
+{
+  "account_id": "0123456789abcdef0123456789abcdef",
+  "buckets": {
+    "bucket_name": "compatible-special-format-0",
+    "bucket_policy": "{\"Statement\": [{\"Effect\": \"Allow\", \"Action\": [\"listBucket\"], \"Principal\": {\"ID\": [\"domain/233\"]}, \"Condition\": {\"stringequals\": {\"g:PrincipalType\": [\"AssumedAgency\"]}}}]}",
+    "bucket_acl": "<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?><AccessControlPolicy xmlns=\"http://obs.cn-north-4.myhuaweicloud.com/doc/2015-06-30/\"><Owner><ID>b4bf1b36d9ca43d984fbcb9491b6fce9</ID></Owner><AccessControlList></AccessControlList></AccessControlPolicy>"
+  }
+}
+
+验证目标（自然语言）:
+验证桶 compatible-special-format-0 的绑定策略中是否存在有效的授权配置
+
+from z3 import *
+
+# 定义变量
+account_id = String("account_id")
+bucket_name = String("bucket_name")
+principal_type = String("principal_type")
+principal_id = String("principal_id")
+action = String("action")
+effect = String("effect")
+
+# 账户信息约束
+s = Solver()
+s.add(account_id == "0123456789abcdef0123456789abcdef")
+s.add(bucket_name == "compatible-special-format-0")
+s.add(principal_type == "AssumedAgency")
+s.add(principal_id == "domain/233")
+s.add(action == "listBucket")
+s.add(effect == "Allow")
+
+# 验证目标约束
+s.add(And(principal_type == "AssumedAgency", principal_id == "domain/233", action == "listBucket", effect == "Allow"))
+
+# 求解
+result = s.check() == sat
