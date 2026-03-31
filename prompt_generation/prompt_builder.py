@@ -58,7 +58,6 @@ def build_generation_prompt(
     Returns:
         The complete generation prompt
     """
-    instruct_text = (instruct_data or {}).get("instruct", "")
     
     # Select base template based on language
     if generate_code_language == 1:
@@ -72,13 +71,13 @@ def build_generation_prompt(
     template = load_prompt_file(template_path)
     user_prompt = template.format(
         account_json=_to_pretty_json(account_data),
-        instruct_text=instruct_text,
+        instruct_text=_to_pretty_json(instruct_data),
     )
     system_prompt = get_generation_system_prompt_by_mode(generate_mode, prompt_config, generate_code_language)
     system_prompt = (
         system_prompt
         .replace("{account_json}", _to_pretty_json(account_data))
-        .replace("{instruct_text}", instruct_text)
+        .replace("{instruct_text}", _to_pretty_json(instruct_data))
     )
 
     return f"{system_prompt}\n\n{user_prompt}"
