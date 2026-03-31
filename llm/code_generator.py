@@ -6,6 +6,8 @@ from log.get_log import get_console_logger
 from prompt_generation.prompt_builder import build_generation_prompt, build_regenerate_prompt
 from concurrent.futures import ThreadPoolExecutor, TimeoutError as FuturesTimeoutError
 
+import time
+
 logger = get_console_logger(__file__)
 
 # Global timeout setting (20 seconds)
@@ -62,7 +64,7 @@ class CodeGenerator:
         self,
         account_data: Dict,
         instruct_data: Dict,
-    ) -> Tuple[str, bool, Optional[str], int]:
+    ) -> Tuple[str, bool, Optional[str], int, float]:
         """
         Generate code with optional regeneration on error.
         
@@ -71,11 +73,12 @@ class CodeGenerator:
             instruct_data: Instruction data containing 'instruct' field
             
         Returns:
-            Tuple of (generated_code, success, error_message, retries_used)
+            Tuple of (generated_code, success, error_message, retries_used, generation_time_sec)
             - generated_code: The Python code generated
             - success: Whether the code executed successfully
             - error_message: Error message if failed, None if successful
             - retries_used: Number of regenerate attempts used
+            - generation_time_sec: Time taken to generate the code
         """
         
         # Build initial generation prompt
@@ -88,14 +91,15 @@ class CodeGenerator:
         )
         
         # Generate code
+        start_time = time.perf_counter()
         generated_code = self._call_llm_for_code_generation(generation_prompt)
         
         if not generated_code:
             logger.error("Failed to generate code from LLM")
-            return "", False, "Failed to generate code from LLM", 0
+            return "", False, "Failed to generate code from LLM", 0, time.perf_counter() - start_time
         
         if not self.regenerate_enabled:
-            return generated_code, True, None, 0
+            return generated_code, True, None, 0, time.perf_counter() - start_time
 
 
         # Try to execute the code
@@ -104,13 +108,13 @@ class CodeGenerator:
         
         if success:
 
-            return generated_code, success, error_msg, 0
-        
+            return generated_code, success, error_msg, 0, time.perf_counter() - start_time
+
 
         logger.warning(f"code execution failed: {error_msg}")
         if not self.regenerate_enabled:
             logger.warning("Regeneration is disabled, returning initial failure")
-            return generated_code, success, error_msg, 0
+            return generated_code, success, error_msg, 0, time.perf_counter() - start_time
         
         # Regenerate with error handling if enabled
         return self._regenerate_with_error_handling(
@@ -118,6 +122,7 @@ class CodeGenerator:
             error_message=error_msg or "Unknown error",
             account_data=account_data,
             instruct_data=instruct_data,
+            start_time=start_time,
         )
     
     def _call_llm_for_code_generation(self, prompt: str) -> Optional[str]:
@@ -378,7 +383,8 @@ class CodeGenerator:
         error_message: str,
         account_data: Dict,
         instruct_data: Dict,
-    ) -> Tuple[str, bool, Optional[str], int]:
+        start_time: float
+    ) -> Tuple[str, bool, Optional[str], int, float]:
         """
         Attempt to regenerate code when initial generation fails.
         
@@ -424,7 +430,7 @@ class CodeGenerator:
             
             if success:
                 logger.info(f"Regenerated code executed successfully on attempt {retry + 1}")
-                return fixed_code, True, None, retries_used
+                return fixed_code, True, None, retries_used, time.perf_counter() - start_time
             
             logger.warning(f"Regenerated code failed on attempt {retry + 1}: {error_msg}")
             # Update for next iteration
@@ -438,4 +444,5 @@ class CodeGenerator:
             False,
             f"Regeneration failed after {self.regenerate_max_retries} retries. Last error: {error_message}",
             retries_used,
+            time.perf_counter() - start_time
         )

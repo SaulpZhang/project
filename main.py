@@ -24,9 +24,7 @@ def generate_code(
 ):
     account_data, instruct_data = extract_data.extract_data(account_path, instruct_path)
 
-    start_time = time.perf_counter()
-    generated_code, success, error_msg, retries_used = code_gen.generate_code(account_data, instruct_data)
-    generation_time_sec = time.perf_counter() - start_time
+    generated_code, success, error_msg, retries_used, generation_time_sec = code_gen.generate_code(account_data, instruct_data)
 
     # Use .smt2 for SMT code, .py for Python code
     file_suffix = ".smt2" if generate_code_language == 1 else ".py"
@@ -161,6 +159,9 @@ if __name__ == "__main__":
                 if run_results:
                     run_result = run_results[0].get("result")
                     run_stdout = run_results[0].get("stdout", "")
+
+            if not args.regenerate_enabled and run_result and run_result.startswith('error'):
+                success = False
 
             record = {
                 "case_id": case_id,
