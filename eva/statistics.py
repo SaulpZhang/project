@@ -24,6 +24,7 @@ def compute_metrics(records: List[Dict[str, Any]], pass_k: int) -> Dict[str, Any
             "total_generations": 0,
             "pass_k": pass_k,
             "pass_at_k": 0.0,
+            "avg_accuracy": 0.0,
             "generation_success_rate": 0.0,
             "avg_retries": 0.0,
             "avg_generation_time_sec": 0.0,
@@ -41,6 +42,7 @@ def compute_metrics(records: List[Dict[str, Any]], pass_k: int) -> Dict[str, Any
 
     total_cases = len(grouped)
     passed_cases = 0
+    pass_case_num = 0
 
     for _, case_records in grouped.items():
         label = bool(case_records[0].get("label"))
@@ -54,7 +56,7 @@ def compute_metrics(records: List[Dict[str, Any]], pass_k: int) -> Dict[str, Any
             run_result = _normalize_run_result(rec.get("run_result"))
             if isinstance(run_result, bool) and run_result == label:
                 case_pass = True
-                break
+                pass_case_num += 1
 
         if case_pass:
             passed_cases += 1
@@ -66,6 +68,7 @@ def compute_metrics(records: List[Dict[str, Any]], pass_k: int) -> Dict[str, Any
         "total_generations": total_generations,
         "pass_k": pass_k,
         "pass_at_k": pass_at_k,
+        "avg_accuracy": pass_case_num / total_generations if total_generations else 0.0,
         "generation_success_rate": success_count / total_generations,
         "avg_retries": avg_retries,
         "avg_generation_time_sec": avg_generation_time_sec,
