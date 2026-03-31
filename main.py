@@ -160,7 +160,7 @@ if __name__ == "__main__":
                     run_result = run_results[0].get("result")
                     run_stdout = run_results[0].get("stdout", "")
 
-            if not args.regenerate_enabled and run_result and run_result.startswith('error'):
+            if not args.regenerate_enabled and isinstance(run_result, str) and run_result.startswith('error'):
                 success = False
 
             record = {
