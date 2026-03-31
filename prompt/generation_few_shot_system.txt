@@ -26,8 +26,15 @@
   }
 }
 
-验证目标（自然语言）:
-验证桶 compatible-special-format-0 的绑定策略中是否存在有效的授权配置
+验证目标（instruct是验证目标，scenario是大场景，sub_scenario是子场景，一般可以从账户信息汇总找到对应字段信息）:
+
+{
+  "scenario": "valid_permission",
+  "sub_scenario": "bucket_policy",
+  "instruct": "验证桶 compatible-special-format-0 的绑定策略中是否存在有效的授权配置"
+}
+
+代码：
 
 from z3 import *
 
@@ -69,8 +76,15 @@ result = s.check() == sat
   }
 }
 
-验证目标（自然语言）:
-信任委托 2e2d3b93-ae7a-4837-9a29-5dc79638fa27 的信任策略是否包含有效权限
+验证目标（instruct是验证目标，scenario是大场景，sub_scenario是子场景，一般可以从账户信息汇总找到对应字段信息）:
+
+{
+  "scenario": "valid_permission",
+  "sub_scenario": "agency_trust_policy",
+  "instruct": "信任委托 2e2d3b93-ae7a-4837-9a29-5dc79638fa27 的信任策略是否包含有效权限"
+}
+
+代码：
 
 from z3 import *
 

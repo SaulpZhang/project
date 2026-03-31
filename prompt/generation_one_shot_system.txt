@@ -22,8 +22,15 @@
   }
 }
 
-验证目标（自然语言）:
-验证桶 compatible-special-format-0 的绑定策略中是否存在有效的授权配置
+验证目标（instruct是验证目标，scenario是大场景，sub_scenario是子场景，一般可以从账户信息汇总找到对应字段信息）:
+
+{
+  "scenario": "valid_permission",
+  "sub_scenario": "bucket_policy",
+  "instruct": "验证桶 compatible-special-format-0 的绑定策略中是否存在有效的授权配置"
+}
+
+代码：
 
 from z3 import *
 
