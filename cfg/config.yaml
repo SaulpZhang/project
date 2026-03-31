@@ -7,8 +7,8 @@ data_process:
 runtime:
   output_dir: './outputs'
   limit: 10000
-  samples_per_case: 5
-  pass_k: 5
+  samples_per_case: 3
+  pass_k: 3
 
 prompt:
   base_prompt_template_path: './prompt/base_prompt_template.txt'
