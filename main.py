@@ -191,6 +191,7 @@ if __name__ == "__main__":
 
     logger_console.info(
         f"Metrics summary: pass@{pass_k}={metrics.get('pass_at_k'):.4f}, "
+        f"avg_accuracy={metrics.get('avg_accuracy'):.4f}, "
         f"generation_success_rate={metrics.get('generation_success_rate'):.4f}, "
         f"avg_retries={metrics.get('avg_retries'):.4f}, "
         f"avg_generation_time_sec={metrics.get('avg_generation_time_sec'):.4f}"
